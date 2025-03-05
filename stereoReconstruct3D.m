@@ -253,6 +253,9 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
     %% Write struct to .mat file, and xyztkj to csv to <input foler>/../Sony_A7_xyzt/
     % To save the final struct (in the input data folder)
     % save(fullfile(input_path, 'result.mat'), 'result');
+
+    % If folder DNE, save the results to the input folder instead, provide
+    % user with a warning
     
 end
 
