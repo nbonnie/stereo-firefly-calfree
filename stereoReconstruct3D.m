@@ -1,11 +1,3 @@
-distance_between_camera_meters = 0.9906;
-input_path = '/Users/arnavps/Desktop/RA info/New project Matlab files/clean project files/20240608/Sony_A7_Stereo_xyt';
-
-result = stereoReconstruct3D(input_path, distance_between_camera_meters);
-
-% To save the final struct (in the input data folder)
-% save(fullfile(input_path, 'result.mat'), 'result');
-
 function result = stereoReconstruct3D(input_path, distance_between_camera_meters)
 % stereoReconstruct3D Production-ready 3D reconstruction from stereo data.
 %
@@ -23,7 +15,7 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
 %       - xyztkj     : Processed trajectories.
 %       - input_path : The input folder path.
 %       - intrinsics : Camera intrinsic parameters.
-%       - K          : Camera matrix.
+%       - K          : Camera intrinsic matrix K.
 %       - E          : Essential matrix (if applicable).
 %       - R          : Rotation matrix.
 %       - t          : Translation vector.
@@ -35,7 +27,7 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
 %       - calculation_method: "E" (Essential) or "F" (Fundamental)
 %
 %   Example:
-%       result = stereoReconstruct3D('C:\data\my_folder', 0.9906);
+%       result = stereoReconstruct3D('/Users/home/.../<YEAR>/<LOCATION>/<DATE>/Sony_A7_xyt/', 0.9906);
 
     %% Initialization and Input Validation
     logMessage('Starting stereoReconstruct3D...');
@@ -47,7 +39,7 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
         error('Distance between cameras must be a positive scalar.');
     end
     logMessage(sprintf('Input path: %s', input_path));
-    logMessage(sprintf('Distance between cameras: %f', distance_between_camera_meters));
+    %logMessage(sprintf('Distance between cameras: %f', distance_between_camera_meters));
     
     %% Define subfolder paths for cam1 and cam2
     cam1_folder = fullfile(input_path, 'cam1');
@@ -56,8 +48,8 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
     if ~isfolder(cam1_folder) || ~isfolder(cam2_folder)
         error('Both cam1 and cam2 subfolders must exist in the input path.');
     end
-    logMessage(sprintf('Found cam1 folder: %s', cam1_folder));
-    logMessage(sprintf('Found cam2 folder: %s', cam2_folder));
+    %logMessage(sprintf('Found cam1 folder: %s', cam1_folder));
+    %logMessage(sprintf('Found cam2 folder: %s', cam2_folder));
     
     %% Read and Load Files from Subfolders
     % Gather files with .mat and .csv extensions
@@ -73,12 +65,12 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
         error('No .mat or .csv files found in cam2 folder: %s', cam2_folder);
     end
     
-    logMessage(sprintf('Found %d file(s) in cam1 folder.', numel(files_cam1)));
-    logMessage(sprintf('Found %d file(s) in cam2 folder.', numel(files_cam2)));
+    %logMessage(sprintf('Found %d file(s) in cam1 folder.', numel(files_cam1)));
+    %logMessage(sprintf('Found %d file(s) in cam2 folder.', numel(files_cam2)));
     
     % Load the first file from each subfolder using the helper function.
     [df1, c1n, ff1] = loadXytFromFile(fullfile(cam1_folder, files_cam1(1).name));
-    [df2, c2n, ff2] = loadXytFromFile(fullfile(cam2_folder, files_cam2(1).name));
+    [df2, c2n, ~] = loadXytFromFile(fullfile(cam2_folder, files_cam2(1).name));
     logMessage(sprintf('Loaded file from cam1: %s', files_cam1(1).name));
     logMessage(sprintf('Loaded file from cam2: %s', files_cam2(1).name));
     
@@ -88,7 +80,7 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
         if ~isempty(ff1) && isfield(ff1, 'bkgrStack')
             frame_width = size(ff1.bkgrStack, 2);
             frame_height = size(ff1.bkgrStack, 1);
-            logMessage('Frame dimensions obtained from file.');
+            %logMessage('Frame dimensions obtained from file.');
         else
             error('ff field not available');
         end
@@ -102,35 +94,16 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
     max_y = max([df1(:,2); df2(:,2)]);
     df1(:,2) = max_y - df1(:,2);
     df2(:,2) = max_y - df2(:,2);
-    logMessage('Adjusted y-values by flipping based on maximum y-value.');
-    
-    %% Filter Data to Remove Persistent Objects and Spurious Detections
-    logMessage('Filtering data based on time and y-value thresholds...');
-    df1(df1(:,3) <= 8000, :) = [];
-    df2(df2(:,3) <= 8000, :) = [];
-    df1(df1(:,2) > 680, :) = [];
-    df2(df2(:,2) > 670, :) = [];
-    
-    % Remove bright detections (e.g., headlamps)
-    [~, ~, ix1] = unique(df1(:,3));
-    C1 = accumarray(ix1, 1).';
-    toRemove = C1(ix1) > 10;
-    df1 = df1(~toRemove, :);
-    
-    [~, ~, ix2] = unique(df2(:,3));
-    C2 = accumarray(ix2, 1).';
-    toRemove = C2(ix2) > 10;
-    df2 = df2(~toRemove, :);
-    logMessage('Filtered out persistent objects and bright detections.');
+    %logMessage('Adjusted y-values by flipping based on maximum y-value.');
     
     %% Add Additional Functions Path
     % Adjust this path as needed for your production environment.
     functions_path = fullfile(fileparts(mfilename('fullpath')), 'main_functions');
     if exist(functions_path, 'dir')
         addpath(genpath(functions_path));
-        logMessage(sprintf('Added functions path: %s', functions_path));
+        %logMessage(sprintf('Added functions path: %s', functions_path));
     else
-        logMessage(sprintf('Functions path does not exist: %s', functions_path));
+        error(strcat('Functions path does not exist: ', string(functions_path)));
     end
     
     %% Calculate Frame Delta (dk)
@@ -141,8 +114,8 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
     calTraj = extractCalibrationTrajectories(df1, df2, dk);
     logMessage(sprintf('Total number of calibration trajectories: %d', size(calTraj.j1, 1)));
     
-    % If too many points, randomly sample to a maximum number
-    maxPoints = 8000;
+    % If calTraj big, randomly downsample for faster computation
+    maxPoints = 10000;
     numPoints = size(calTraj.j1, 1);
     if numPoints > maxPoints
         idx = randperm(numPoints, maxPoints);
@@ -159,7 +132,7 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
             cameraParams = S.cameraParams;
             intrinsics = cameraParams.Intrinsics;
             K = intrinsics.K;
-            logMessage(sprintf('Loaded camera parameters from %s', paramsFile));
+            %logMessage(sprintf('Loaded camera parameters from %s', paramsFile));
         else
             error('The file %s does not contain the variable cameraParams.', paramsFile);
         end
@@ -181,7 +154,7 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
         stereoParams.R = R;
         stereoParams.E = E;
         stereoParams.K = K;
-        logMessage('Estimated parameters using Essential matrix method.');
+        logMessage('Estimated E,R,t parameters using Essential matrix method.');
         
         % Matching points using the Essential method
         logMessage('Beginning point matching and triangulation with Essential matrix...');
@@ -205,7 +178,7 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
         stereoParams.E = E;
         stereoParams.F = F;
         stereoParams.K = K;
-        logMessage('Estimated parameters using Fundamental matrix method.');
+        logMessage('Estimated E,R,t, parameters using Fundamental matrix method.');
         
         % Matching points using the Fundamental method
         logMessage('Beginning point matching and triangulation with Fundamental matrix...');
@@ -221,36 +194,39 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
     xyz = triangulate(matched_points_1(:,1:2), matched_points_2(:,1:2), P1', P2');
     logMessage('Triangulation complete.');
     
-    % Append the timestamp (assumed from matched_points_1(:,3)) to xyz
+    % Append the timestamp to xyz
     xyzt = [xyz, matched_points_1(:,3)];
     
     % Reorient coordinates from camera (-x,z,y) to real (x,y,z)
     xyzt(:,1) = -xyzt(:,1);
     xyzt(:, [2,3]) = xyzt(:, [3,2]);
-    logMessage('Reoriented triangulated points to real-world coordinates.');
+    %logMessage('Reoriented triangulated points to real-world coordinates.');
     
     %% Trajectorize and Post-Process Trajectories
     xyztkj = trajectorize(xyzt);
     
-    % Remove streaks with fewer than 4 detections
-    [unique_k, ~, k_idx] = unique(xyztkj(:,5));
-    streak_counts = accumarray(k_idx, 1);
-    valid_streaks = unique_k(streak_counts >= 4);
-    xyztkj = xyztkj(ismember(xyztkj(:,5), valid_streaks), :);
-    
-    % Remove trajectories with fewer than 3 unique streaks
-    [unique_j, ~, j_idx] = unique(xyztkj(:,6));
-    unique_streaks_per_j = accumarray(j_idx, xyztkj(:,5), [], @(x) numel(unique(x)));
-    valid_trajectories = unique_j(unique_streaks_per_j >= 3);
-    xyztkj = xyztkj(ismember(xyztkj(:,6), valid_trajectories), :);
-    logMessage('Processed and filtered trajectories.');
+    % Optional post-processing scripts to set minimum number of points in a streak,
+    % And the minimum number of streaks to make a trajectory
+
+    % % Remove streaks with fewer than 4 detections
+    % [unique_k, ~, k_idx] = unique(xyztkj(:,5));
+    % streak_counts = accumarray(k_idx, 1);
+    % valid_streaks = unique_k(streak_counts >= 4);
+    % xyztkj = xyztkj(ismember(xyztkj(:,5), valid_streaks), :);
+    % 
+    % % Remove trajectories with fewer than 3 unique streaks
+    % [unique_j, ~, j_idx] = unique(xyztkj(:,6));
+    % unique_streaks_per_j = accumarray(j_idx, xyztkj(:,5), [], @(x) numel(unique(x)));
+    % valid_trajectories = unique_j(unique_streaks_per_j >= 3);
+    % xyztkj = xyztkj(ismember(xyztkj(:,6), valid_trajectories), :);
+    % logMessage('Processed and filtered trajectories.');
     
     %% Optional: Plot 3D Reconstruction
-    figure;
-    scatter3(xyztkj(:,1), xyztkj(:,2), xyztkj(:,3), 20, xyztkj(:,6), 'filled');
-    xlabel('X'); ylabel('Y'); zlabel('Z');
-    title('3D Reconstruction');
-    logMessage('Displayed 3D reconstruction plot.');
+    % figure;
+    % scatter3(xyztkj(:,1), xyztkj(:,2), xyztkj(:,3), 20, xyztkj(:,6), 'filled');
+    % xlabel('X'); ylabel('Y'); zlabel('Z');
+    % title('3D Reconstruction');
+    % logMessage('Displayed 3D reconstruction plot.');
     
     %% Build Output Structure
     result = struct();
@@ -272,53 +248,60 @@ function result = stereoReconstruct3D(input_path, distance_between_camera_meters
     if isfield(stereoParams, 'F')
         result.F = stereoParams.F;
     end
-    logMessage('Stereo reconstruction complete. Returning results.');
+    logMessage('Stereo reconstruction complete. Writing results.');
+
+    %% Write struct to .mat file, and xyztkj to csv to <input foler>/../Sony_A7_xyzt/
+    % To save the final struct (in the input data folder)
+    % save(fullfile(input_path, 'result.mat'), 'result');
     
-    %% Nested Helper Function to Load xyt Files
-    function [df, n, ff] = loadXytFromFile(filePath)
-        % loadXytFromFile Loads xyt data from a file.
-        %   Supports .mat and .csv files.
-        %
-        %   [df, n, ff] = loadXytFromFile(filePath) returns the xyt data (df),
-        %   frame numbers (n), and optionally the ff structure if available.
-        %
-        [~,~,ext] = fileparts(filePath);
-        ff = [];  % default if not available
-        if strcmpi(ext, '.mat')
-            data = load(filePath);
-            fns = fieldnames(data);
-            if isempty(fns)
-                error('The loaded .mat file %s does not contain expected fields.', filePath);
-            end
-            s = data.(fns{1});
-            if isfield(s, 'xyt')
-                df = s.xyt;
-            else
-                error('Field xyt not found in file: %s', filePath);
-            end
-            if isfield(s, 'n')
-                n = s.n;
-            else
-                n = (1:size(df,1))';
-            end
-            if isfield(data, 'ff')
-                ff = data.ff;
-            end
-        elseif strcmpi(ext, '.csv')
-            df = readmatrix(filePath);
-            if size(df,2) >= 3
-                n = df(:,3);
-            else
-                n = (1:size(df,1))';
-            end
-        else
-            error('Unsupported file extension: %s', ext);
+end
+
+
+
+% Helper Function to Load xyt Files
+function [df, n, ff] = loadXytFromFile(filePath)
+    % loadXytFromFile Loads xyt data from a file.
+    %   Supports .mat and .csv files.
+    %
+    %   [df, n, ff] = loadXytFromFile(filePath) returns the xyt data (df),
+    %   frame numbers (n), and optionally the ff structure if available.
+    %
+    [~,~,ext] = fileparts(filePath);
+    ff = [];  % default if not available
+    if strcmpi(ext, '.mat')
+        data = load(filePath);
+        fns = fieldnames(data);
+        if isempty(fns)
+            error('The loaded .mat file %s does not contain expected fields.', filePath);
         end
+        s = data.(fns{1});
+        if isfield(s, 'xyt')
+            df = s.xyt;
+        else
+            error('Field xyt not found in file: %s', filePath);
+        end
+        if isfield(s, 'n')
+            n = s.n;
+        else
+            n = (1:size(df,1))';
+        end
+        if isfield(data, 'ff')
+            ff = data.ff;
+        end
+    elseif strcmpi(ext, '.csv')
+        df = readmatrix(filePath);
+        if size(df,2) >= 3
+            n = df(:,3);
+        else
+            n = (1:size(df,1))';
+        end
+    else
+        error('Unsupported file extension: %s', ext);
     end
 end
 
 function logMessage(message)
 % logMessage Simple logger that prints a message with a timestamp.
-    timestamp = datestr(now, 'yyyy-mm-dd HH:MM:SS');
+    timestamp = datetime('now');
     fprintf('[%s] %s\n', timestamp, message);
 end
